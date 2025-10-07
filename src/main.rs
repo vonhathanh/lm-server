@@ -15,7 +15,6 @@ fn main() {
 }
 
 fn handle_connection(mut stream: TcpStream) {
-    println!("Connection estalished");
     let buf_reader = BufReader::new(&stream);
     let first_line = buf_reader.lines().next().unwrap().unwrap();
 
@@ -23,15 +22,21 @@ fn handle_connection(mut stream: TcpStream) {
 
     let (status_line, content) = if first_line == "GET / HTTP/1.1" {
         ("HTTP/1.1 200 OK", "{'message': 'hello world'}")
-    }else {
+    } else {
         ("HTTP/1.1 404 NOT FOUND", "{'message': 'not found'}")
     };
 
     if first_line == "GET / HTTP/1.1" {
-        let response = format!("{status_line}\r\nContent-Length: {}\r\n\r\n{content}", content.len());
+        let response = format!(
+            "{status_line}\r\nContent-Length: {}\r\n\r\n{content}",
+            content.len()
+        );
         stream.write_all(response.as_bytes()).unwrap();
     } else {
-        let response = format!("{status_line}\r\nContent-Length: {}\r\n\r\n{content}", content.len());
+        let response = format!(
+            "{status_line}\r\nContent-Length: {}\r\n\r\n{content}",
+            content.len()
+        );
         stream.write_all(response.as_bytes()).unwrap();
     }
 }
