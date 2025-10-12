@@ -9,8 +9,12 @@ const SERVER_ADDRESS: &str = "127.0.0.1:8000";
 pub trait IRequest {}
 pub trait IResponse {}
 
-pub struct Request;
-pub struct Response;
+pub struct Request {
+    path_variables: Vec<String>,
+    query_parameters: Vec<(String, String)>,
+    body: String
+}
+pub struct Response(String);
 
 impl IRequest for Request {}
 
@@ -54,7 +58,7 @@ impl<T: IRequest, V: IResponse> Server<T, V> {
         println!("Server is listening at: {SERVER_ADDRESS}");
         for stream in listener.incoming() {
             let tcp_stream = stream.unwrap();
-            handle_connection(tcp_stream);
+            self.handle_connection(tcp_stream);
         }
     }
 
@@ -73,34 +77,63 @@ impl<T: IRequest, V: IResponse> Server<T, V> {
     pub fn delete(&mut self, path: String, handler: RequestHandler<T, V>) {
         self.delete_routes.add(path, handler);
     }
-}
 
-fn handle_connection(mut stream: TcpStream) {
-    let buf_reader = BufReader::new(&stream);
-    // let request_info: RequestInfo = RequestInfo::new(first_line);
+    fn handle_connection(&self, mut stream: TcpStream) {
+        let buf_reader = BufReader::new(&stream);
+        // let request_info: RequestInfo = RequestInfo::new(first_line);
 
-    let content: Vec<String> = buf_reader
-        .lines()
-        .map(|value| value.unwrap())
-        .take_while(|line| !line.is_empty())
-        .collect();
+        let content: Vec<String> = buf_reader
+            .lines()
+            .map(|value| value.unwrap())
+            .take_while(|line| !line.is_empty())
+            .collect();
 
-    println!("Request content: {content:#?}");
-    let request_data: Vec<_> = content[0].split('c').collect();
+        println!("Request content: {content:#?}");
+        let request: Request = Server::<T, V>::parse_request(&content[0]);
 
-    // if content[0] == "GET / HTTP/1.1" {
-    //     let response = format!(
-    //         "{status_line}\r\nContent-Length: {}\r\n\r\n{response}",
-    //         response.len()
-    //     );
-    //     stream.write_all(response.as_bytes()).unwrap();
-    // } else {
-    //     let response = format!(
-    //         "{status_line}\r\nContent-Length: {}\r\n\r\n{response}",
-    //         response.len()
-    //     );
-    //     stream.write_all(response.as_bytes()).unwrap();
-    // }
+        // if content[0] == "GET / HTTP/1.1" {
+        //     let response = format!(
+        //         "{status_line}\r\nContent-Length: {}\r\n\r\n{response}",
+        //         response.len()
+        //     );
+        //     stream.write_all(response.as_bytes()).unwrap();
+        // } else {
+        //     let response = format!(
+        //         "{status_line}\r\nContent-Length: {}\r\n\r\n{response}",
+        //         response.len()
+        //     );
+        //     stream.write_all(response.as_bytes()).unwrap();
+        // }
+    }
+
+    fn parse_request(input: &String) -> Request {
+        let request_data: Vec<&str> = input.split(' ').collect();
+        assert!(request_data.len() == 3);
+        let method = request_data[0];
+        let path = request_data[1];
+        let version = request_data[2];
+
+        let (query_parameters, path_variables) = Server::<T, V>::parse_path(path);
+
+        Request { path_variables, query_parameters, body: "".to_string() }
+    }
+
+    fn parse_path(input: &str) -> (Vec<(String, String)>, Vec<String>) {
+        let mut query_parameters = vec![];
+        let mut path = &input[..];
+        if let Some(idx) = input.find('?') {
+            let query_parts: Vec<&str> = input[idx+1..].split('&').collect();
+            for query in query_parts {
+                let query_detail: Vec<&str> = query.split('=').collect();
+                assert!(query_detail.len() == 2);
+                query_parameters.push((query_detail[0].to_string(), query_detail[1].to_string()));
+            }
+            path = &input[..idx];
+        }
+        let p: Vec<&str> = path.split('/').collect();
+        let path_variables: Vec<String> = p.iter().map(|s| format!("/{s}")).collect();
+        return (query_parameters, path_variables)
+    }
 }
 
 impl<T, V> RouteCollection<T, V> {
