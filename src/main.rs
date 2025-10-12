@@ -1,42 +1,16 @@
-use std::{
-    io::{BufRead, BufReader, Write},
-    net::{TcpListener, TcpStream},
-};
+use crate::server::{Request, Response, Server};
 
-const SERVER_ADDRESS: &str = "127.0.0.1:8000";
+pub mod server;
 
-fn main() {
-    let listener = TcpListener::bind(SERVER_ADDRESS).unwrap();
-    println!("Server is listening at: {SERVER_ADDRESS}");
-    for stream in listener.incoming() {
-        let tcp_stream = stream.unwrap();
-        handle_connection(tcp_stream);
-    }
+fn index(r: Request) -> Response {
+    !todo!()
 }
 
-fn handle_connection(mut stream: TcpStream) {
-    let buf_reader = BufReader::new(&stream);
-    let first_line = buf_reader.lines().next().unwrap().unwrap();
-
-    println!("request path: {first_line}");
-
-    let (status_line, content) = if first_line == "GET / HTTP/1.1" {
-        ("HTTP/1.1 200 OK", "{'message': 'hello world'}")
-    } else {
-        ("HTTP/1.1 404 NOT FOUND", "{'message': 'not found'}")
-    };
-
-    if first_line == "GET / HTTP/1.1" {
-        let response = format!(
-            "{status_line}\r\nContent-Length: {}\r\n\r\n{content}",
-            content.len()
-        );
-        stream.write_all(response.as_bytes()).unwrap();
-    } else {
-        let response = format!(
-            "{status_line}\r\nContent-Length: {}\r\n\r\n{content}",
-            content.len()
-        );
-        stream.write_all(response.as_bytes()).unwrap();
-    }
+fn main() {
+    let mut server = Server::<Request, Response>::new();
+    server.get("/".to_string(), index);
+    server.post("/user/hanhvn".to_string(), index);
+    server.put("/user?age=10&occupation=developer".to_string(), index);
+    server.delete("/book/chaper/12".to_string(), index);
+    server.run();
 }
