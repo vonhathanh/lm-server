@@ -1,6 +1,7 @@
 use crate::server::{Request, Response, Server};
 
 pub mod server;
+pub mod server_utils;
 
 fn index(r: Request) -> Response {
     !todo!()
