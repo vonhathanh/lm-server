@@ -12,6 +12,7 @@ pub trait IRequest {}
 pub trait IResponse {}
 
 pub struct Request {
+    pub method: String,
     pub path_variables: Vec<String>,
     pub query_parameters: Vec<(String, String)>,
     pub body: String
@@ -40,8 +41,8 @@ struct RouteCollection<T, V> {
 }
 
 struct Route<T, V> {
-    placeholder: String,
-    handler: RequestHandler<T, V>,
+    placeholder: Option<String>,
+    handler: Option<RequestHandler<T, V>>,
     sub_routes: HashMap<String, Route<T, V>>,
 }
 
@@ -93,6 +94,8 @@ impl<T: IRequest, V: IResponse> Server<T, V> {
         println!("Request content: {content:#?}");
         let request: Request = parse_request(&content[0]);
 
+        self.match_request(&request);
+
         // if content[0] == "GET / HTTP/1.1" {
         //     let response = format!(
         //         "{status_line}\r\nContent-Length: {}\r\n\r\n{response}",
@@ -107,6 +110,20 @@ impl<T: IRequest, V: IResponse> Server<T, V> {
         //     stream.write_all(response.as_bytes()).unwrap();
         // }
     }
+
+    fn match_request(&self, request: &Request){
+        if request.method == "GET" {
+            self.get_routes.handle(request);
+        } else if request.method == "POST" {
+            self.post_routes.handle(request);
+        } else if request.method == "PUT" {
+            self.put_routes.handle(request);
+        } else if request.method == "DELETE" {
+            self.delete_routes.handle(request);
+        } else {
+            panic!("Unrecognize request method!")
+        }
+    }
 }
 
 impl<T, V> RouteCollection<T, V> {
@@ -117,21 +134,74 @@ impl<T, V> RouteCollection<T, V> {
     }
 
     fn add(&mut self, path: String, handler: RequestHandler<T, V>) {
-        self.routes
-            .insert(path, Route::new("".to_string(), handler, HashMap::new()));
+        let mut tokens: Vec<&str> = path.split_terminator('/').collect();
+        let root = tokens[0];
+        let mut placeholder: Option<String> = None;
+
+        if root.find(':') == Some(1) {
+            placeholder = Some(root[1..].to_string());
+        }
+        if self.routes.contains_key(root) {
+            let route = self.routes.get_mut(root).unwrap();
+            if tokens.len() > 1 {
+                route.add(tokens.split_off(1), handler);
+            }
+        } else {
+            let mut route ;
+            if tokens.len() == 1 {
+                route = Route::new(placeholder, Some(handler), HashMap::new());
+            } else {
+                route = Route::new(placeholder, None, HashMap::new());
+            }
+            route.add(tokens.split_off(1), handler);
+            self.routes.entry(root.to_string()).or_insert(route);
+        }
+    }
+
+    fn handle(&self, request: &Request) {
+
     }
 }
 
 impl<T, V> Route<T, V> {
     fn new(
-        placeholder: String,
-        handler: RequestHandler<T, V>,
+        placeholder: Option<String>,
+        handler: Option<RequestHandler<T, V>>,
         sub_routes: HashMap<String, Route<T, V>>,
     ) -> Self {
         Route {
             placeholder,
             handler,
             sub_routes,
+        }
+    }
+
+    fn add(&mut self, mut tokens: Vec<&str>, handler: RequestHandler<T, V>) {
+        if tokens.len() == 0 {
+            return;
+        }
+
+        let root = tokens[0];
+        let mut placeholder: Option<String> = None;
+
+        if root.find(':') == Some(0) {
+            placeholder = Some(root[1..].to_string());
+        }
+
+        if self.sub_routes.contains_key(root) {
+            let route = self.sub_routes.get_mut(root).unwrap();
+            if tokens.len() > 1 {
+                route.add(tokens.split_off(1), handler);
+            }
+        } else {
+            let mut route ;
+            if tokens.len() == 1 {
+                route = Route::new(placeholder, Some(handler), HashMap::new());
+            } else {
+                route = Route::new(placeholder, None, HashMap::new());
+            }
+            route.add(tokens.split_off(1), handler);
+            self.sub_routes.entry(root.to_string()).or_insert(route);
         }
     }
 }

@@ -2,7 +2,7 @@ use crate::server::Request;
 
 pub fn parse_request(input: &String) -> Request {
         let request_data: Vec<&str> = input.split(' ').collect();
-        let [method, path, version] = request_data[..] else {
+        let [method, path, _version] = request_data[..] else {
             panic!("invalid request")
         };
 
@@ -20,7 +20,7 @@ pub fn parse_request(input: &String) -> Request {
             }
         }
 
-        Request { path_variables, query_parameters, body: "".to_string() }
+        Request { method: method.to_string(), path_variables, query_parameters, body: "".to_string() }
     }
 
 fn parse_path_variables(input: &str) -> Vec<String> {
