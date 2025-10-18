@@ -142,47 +142,57 @@ impl<T, V> Route<T, V> {
         }
     }
 
+    fn prepare_input(&mut self, tokens: &mut Vec<&str>) -> (String, Option<String>) {
+        // skip the first token if it's the index root
+        if tokens[0] == "".to_string() && tokens.len() > 1 {
+            // TODO: use devec to pop the index
+            tokens.remove(0);
+        }
+
+        let root = tokens[0];
+
+        let placeholder = if root.find(':') == Some(0) {
+            Some(root[1..].to_string())
+        } else {
+            None
+        };
+
+        return (root.to_owned(), placeholder)
+    }
+
     fn add(&mut self, mut tokens: Vec<&str>, handler: RequestHandler<T, V>) {
         if tokens.len() == 0 {
             return;
         }
-
-        if tokens[0] == "".to_string() && tokens.len() > 1 {
-            tokens = tokens.split_off(1);
-        }
-
-        // skip the first token if it's the index root
-        let root = tokens[0];
-        let mut placeholder: Option<String> = None;
-
-        // index root (/) detected, just need to update handler function
+        // index Route (/) is detected, just need to update handler function
         if self.path == "/".to_string() && tokens.len() == 1 {
             self.handler = Some(handler);
             return;
         }
 
-        // placeholder detection likes :id, :name...
-        if root.find(':') == Some(0) {
-            placeholder = Some(root[1..].to_string());
-        }
+        let (token, placeholder) = self.prepare_input(&mut tokens);
 
         // this route is already added
-        if self.sub_routes.contains_key(root) {
+        if self.sub_routes.contains_key(&token) {
             // not the end of the full route, delegate the add route task to it's corresponding sub route.
+            // compare with 1 because the first element is the token variable
             if tokens.len() > 1 {
-                let route = self.sub_routes.get_mut(root).unwrap();
+                let route = self.sub_routes.get_mut(&token).unwrap();
                 route.add(tokens.split_off(1), handler);
+            } else {
+                panic!("Route is added already, name: {}{}", self.path, token)
             }
         } else {
-            let path = format!("{}{}/", self.path, root);
-            let mut route;
-            if tokens.len() == 1 {
-                route = Route::new(path, placeholder, Some(handler), HashMap::new());
+            let path = format!("{}{}/", self.path, token);
+            let mut route = if tokens.len() == 1 {
+                // only add handler at the end of the tokens vector
+                Route::new(path, placeholder, Some(handler), HashMap::new())
             } else {
-                route = Route::new(path, placeholder, None, HashMap::new());
-            }
+                Route::new(path, placeholder, None, HashMap::new())
+            };
+            // will split at 1 panic? No, it panic if at > len()
             route.add(tokens.split_off(1), handler);
-            self.sub_routes.entry(root.to_string()).or_insert(route);
+            self.sub_routes.entry(token.to_string()).or_insert(route);
         }
     }
 
