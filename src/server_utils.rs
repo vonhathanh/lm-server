@@ -1,24 +1,27 @@
 use crate::server::Request;
 
 pub fn parse_request(input: &String) -> Request {
-        let request_data: Vec<&str> = input.split(' ').collect();
-        let [method, path, _version] = request_data[..] else {
-            panic!("invalid request")
-        };
+    let request_data: Vec<&str> = input.split(' ').collect();
+    let [method, path, _version] = request_data[..] else {
+        panic!("invalid request")
+    };
 
-        let query: Vec<(String, String)>;
+    let query: Vec<(String, String)>;
 
-        match path.find('?') {
-            Some(idx) => {
-                query = parse_query(&path[idx+1..])
-            },
-            None => {
-                query = Vec::new();
-            }
+    match path.find('?') {
+        Some(idx) => query = parse_query(&path[idx + 1..]),
+        None => {
+            query = Vec::new();
         }
-
-        Request { method: method.to_string(), path: path.to_string(), query, body: "".to_string() }
     }
+
+    Request {
+        method: method.to_string(),
+        path: path.to_string(),
+        query,
+        body: "".to_string(),
+    }
+}
 
 fn parse_query(input: &str) -> Vec<(String, String)> {
     let mut query = vec![];
