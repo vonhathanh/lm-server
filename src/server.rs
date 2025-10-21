@@ -40,7 +40,15 @@ impl IRequest for Request {
     }
 }
 
-impl IResponse for Response {}
+impl IResponse for Response {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn body(&self) -> &String {
+        &self.0
+    }
+}
 
 type RequestHandler = Box<dyn Fn(&dyn IRequest) -> Box<dyn IResponse>>;
 
