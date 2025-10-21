@@ -53,7 +53,7 @@ impl IResponse for Response {
 type RequestHandler = Box<dyn Fn(&dyn IRequest) -> Box<dyn IResponse>>;
 
 pub struct Server {
-    routes: HashMap<String, HashMap<String, Route>>
+    routes: HashMap<String, HashMap<String, Route>>,
 }
 
 struct Route {
@@ -63,16 +63,12 @@ struct Route {
 impl Server {
     pub fn new() -> Self {
         Server {
-            routes: HashMap::new()
+            routes: HashMap::new(),
         }
     }
 
     pub fn run(&self) {
         let listener = TcpListener::bind(SERVER_ADDRESS).unwrap();
-        // println!("GETs: {}", self.get_routes);
-        // println!("POSTs: {}", self.post_routes);
-        // println!("PUTs: {}", self.put_routes);
-        // println!("DELETEs: {}", self.delete_routes);
         println!("Server is listening at: {SERVER_ADDRESS}");
         for stream in listener.incoming() {
             let tcp_stream = stream.unwrap();
