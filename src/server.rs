@@ -1,5 +1,7 @@
 use std::{
-    collections::HashMap, io::{BufRead, BufReader}, net::{TcpListener, TcpStream}
+    collections::HashMap,
+    io::{BufRead, BufReader, Write},
+    net::{TcpListener, TcpStream},
 };
 
 use crate::server_utils::parse_request;
@@ -76,27 +78,55 @@ impl Server {
         }
     }
 
-    pub fn get<F>(&mut self, path: String, handler: F) 
-    where F: Fn(&dyn IRequest) -> Box<dyn IResponse> + 'static,
+    pub fn get<F>(&mut self, path: String, handler: F)
+    where
+        F: Fn(&dyn IRequest) -> Box<dyn IResponse> + 'static,
     {
-        let root = self.routes.entry("GET".to_string()).or_insert(HashMap::new());
+        let root = self
+            .routes
+            .entry("GET".to_string())
+            .or_insert(HashMap::new());
         let route = Route::new(Box::new(handler));
         root.insert(path, route);
     }
 
-    // pub fn post(&mut self, path: String, handler: RequestHandler) {
-    //     self.post_routes.add(path.split_terminator('/').collect(), handler);
-    // }
+    pub fn post<F>(&mut self, path: String, handler: F)
+    where
+        F: Fn(&dyn IRequest) -> Box<dyn IResponse> + 'static,
+    {
+        let root = self
+            .routes
+            .entry("POST".to_string())
+            .or_insert(HashMap::new());
+        let route = Route::new(Box::new(handler));
+        root.insert(path, route);
+    }
 
-    // pub fn put(&mut self, path: String, handler: RequestHandler) {
-    //     self.put_routes.add(path.split_terminator('/').collect(), handler);
-    // }
+    pub fn put<F>(&mut self, path: String, handler: F)
+    where
+        F: Fn(&dyn IRequest) -> Box<dyn IResponse> + 'static,
+    {
+        let root = self
+            .routes
+            .entry("PUT".to_string())
+            .or_insert(HashMap::new());
+        let route = Route::new(Box::new(handler));
+        root.insert(path, route);
+    }
 
-    // pub fn delete(&mut self, path: String, handler: RequestHandler) {
-    //     self.delete_routes.add(path.split_terminator('/').collect(), handler);
-    // }
+    pub fn delete<F>(&mut self, path: String, handler: F)
+    where
+        F: Fn(&dyn IRequest) -> Box<dyn IResponse> + 'static,
+    {
+        let root = self
+            .routes
+            .entry("DELETE".to_string())
+            .or_insert(HashMap::new());
+        let route = Route::new(Box::new(handler));
+        root.insert(path, route);
+    }
 
-    fn handle_connection(&self, mut stream: TcpStream) -> Box<dyn IResponse> {
+    fn handle_connection(&self, mut stream: TcpStream) {
         let buf_reader = BufReader::new(&stream);
         let content: Vec<String> = buf_reader
             .lines()
@@ -107,38 +137,25 @@ impl Server {
         println!("Request content: {content:#?}");
         let request: Request = parse_request(&content[0]);
 
-        self.match_request(&request)
-
-        // if content[0] == "GET / HTTP/1.1" {
-        //     let response = format!(
-        //         "{status_line}\r\nContent-Length: {}\r\n\r\n{response}",
-        //         response.len()
-        //     );
-        //     stream.write_all(response.as_bytes()).unwrap();
-        // } else {
-        //     let response = format!(
-        //         "{status_line}\r\nContent-Length: {}\r\n\r\n{response}",
-        //         response.len()
-        //     );
-        //     stream.write_all(response.as_bytes()).unwrap();
-        // }
+        self.match_request(&request, &mut stream);
     }
 
-    fn match_request(&self, request: &impl IRequest) -> Box<dyn IResponse> {
+    fn match_request(&self, request: &impl IRequest, stream: &mut TcpStream) {
         let method = request.get_method();
         let root = self.routes.get(&method).unwrap();
         let handler = root.get(request.get_path()).unwrap();
-        handler.handler.as_ref()(request)
+        let response = handler.handler.as_ref()(request);
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+            response.len(),
+            response.body()
+        );
+        stream.write_all(response.as_bytes()).unwrap();
     }
 }
 
-impl Route 
-{
-    fn new(
-        handler: RequestHandler,
-    ) -> Self {
-        Route {
-            handler,
-        }
+impl Route {
+    fn new(handler: RequestHandler) -> Self {
+        Route { handler }
     }
 }
