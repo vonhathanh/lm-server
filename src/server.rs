@@ -12,7 +12,10 @@ pub trait IRequest {
     fn get_query(&self) -> &Vec<(String, String)>;
 }
 
-pub trait IResponse {}
+pub trait IResponse {
+    fn len(&self) -> usize;
+    fn body(&self) -> &String;
+}
 
 #[derive(Debug)]
 pub struct Request {
