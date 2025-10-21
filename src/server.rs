@@ -1,12 +1,16 @@
 use std::{
-    collections::HashMap, fmt::{format, write, Display}, io::{BufRead, BufReader, Write}, net::{TcpListener, TcpStream}
+    collections::HashMap, fmt::{Display}, io::{BufRead, BufReader, Write}, net::{TcpListener, TcpStream}
 };
 
 use crate::server_utils::parse_request;
 
 const SERVER_ADDRESS: &str = "127.0.0.1:8000";
 
-pub trait IRequest {}
+pub trait IRequest {
+    fn get_method(&self) -> String;
+    fn get_path_variables(&self) -> &Vec<String>;
+    fn get_query_parameters(&self) -> &Vec<(String, String)>;
+}
 pub trait IResponse {}
 
 #[derive(Debug)]
@@ -18,32 +22,40 @@ pub struct Request {
 }
 pub struct Response(pub String);
 
-impl IRequest for Request {}
+impl IRequest for Request {
+    fn get_method(&self) -> String {
+        self.method.clone()
+    }
+
+    fn get_path_variables(&self) -> &Vec<String> {
+        &self.path_variables
+    }
+
+    fn get_query_parameters(&self) -> &Vec<(String, String)> {
+        &self.query_parameters
+    }
+}
 
 impl IResponse for Response {}
 
-type RequestHandler<T, V> = fn(value: T) -> V;
+type RequestHandler = Box<dyn Fn(&dyn IRequest) -> Box<dyn IResponse> + Send + Sync>;
 
-pub struct Server<T, V>
-where
-    T: IRequest,
-    V: IResponse,
+pub struct Server
 {
-    get_routes: Route<T, V>,
-    post_routes: Route<T, V>,
-    delete_routes: Route<T, V>,
-    put_routes: Route<T, V>,
+    get_routes: Route,
+    post_routes: Route,
+    delete_routes: Route,
+    put_routes: Route,
 }
 
-#[derive(Debug)]
-struct Route<T, V> {
+struct Route {
     path: String,
     placeholder: Option<String>,
-    handler: Option<RequestHandler<T, V>>,
-    sub_routes: HashMap<String, Route<T, V>>,
+    handler: Option<RequestHandler>,
+    sub_routes: HashMap<String, Route>,
 }
 
-impl<T: IRequest, V: IResponse> Server<T, V> {
+impl Server {
     pub fn new() -> Self {
         Server {
             get_routes: Route {path: "/".to_string(), placeholder: None, handler: None, sub_routes: HashMap::new() },
@@ -66,26 +78,26 @@ impl<T: IRequest, V: IResponse> Server<T, V> {
         }
     }
 
-    pub fn get(&mut self, path: String, handler: RequestHandler<T, V>) {
+    pub fn get<F>(&mut self, path: String, handler: F) 
+    where F: Fn(&dyn IRequest) -> Box<dyn IResponse> + Send + Sync + 'static,
+    {
         self.get_routes.add(path.split_terminator('/').collect(), handler);
     }
 
-    pub fn post(&mut self, path: String, handler: RequestHandler<T, V>) {
+    pub fn post(&mut self, path: String, handler: RequestHandler) {
         self.post_routes.add(path.split_terminator('/').collect(), handler);
     }
 
-    pub fn put(&mut self, path: String, handler: RequestHandler<T, V>) {
+    pub fn put(&mut self, path: String, handler: RequestHandler) {
         self.put_routes.add(path.split_terminator('/').collect(), handler);
     }
 
-    pub fn delete(&mut self, path: String, handler: RequestHandler<T, V>) {
+    pub fn delete(&mut self, path: String, handler: RequestHandler) {
         self.delete_routes.add(path.split_terminator('/').collect(), handler);
     }
 
     fn handle_connection(&self, mut stream: TcpStream) {
         let buf_reader = BufReader::new(&stream);
-        // let request_info: RequestInfo = RequestInfo::new(first_line);
-
         let content: Vec<String> = buf_reader
             .lines()
             .map(|value| value.unwrap())
@@ -112,14 +124,15 @@ impl<T: IRequest, V: IResponse> Server<T, V> {
         // }
     }
 
-    fn match_request(&self, request: &Request) {
-        if request.method == "GET" {
+    fn match_request(&self, request: &impl IRequest) {
+        let method = request.get_method();
+        if method == "GET" {
             self.get_routes.handle(request);
-        } else if request.method == "POST" {
+        } else if method == "POST" {
             self.post_routes.handle(request);
-        } else if request.method == "PUT" {
+        } else if method == "PUT" {
             self.put_routes.handle(request);
-        } else if request.method == "DELETE" {
+        } else if method == "DELETE" {
             self.delete_routes.handle(request);
         } else {
             panic!("Unrecognize request method!")
@@ -127,12 +140,13 @@ impl<T: IRequest, V: IResponse> Server<T, V> {
     }
 }
 
-impl<T, V> Route<T, V> {
+impl Route 
+{
     fn new(
         path: String,
         placeholder: Option<String>,
-        handler: Option<RequestHandler<T, V>>,
-        sub_routes: HashMap<String, Route<T, V>>,
+        handler: Option<RequestHandler>,
+        sub_routes: HashMap<String, Route>,
     ) -> Self {
         Route {
             path,
@@ -160,13 +174,15 @@ impl<T, V> Route<T, V> {
         return (root.to_owned(), placeholder)
     }
 
-    fn add(&mut self, mut tokens: Vec<&str>, handler: RequestHandler<T, V>) {
+    fn add<F>(&mut self, mut tokens: Vec<&str>, handler: F) 
+    where F: Fn(&dyn IRequest) -> Box<dyn IResponse> + Send + Sync + 'static,
+    {
         if tokens.len() == 0 {
             return;
         }
         // index Route (/) is detected, just need to update handler function
         if self.path == "/".to_string() && tokens.len() == 1 {
-            self.handler = Some(handler);
+            self.handler = Some(Box::new(handler));
             return;
         }
 
@@ -184,22 +200,33 @@ impl<T, V> Route<T, V> {
             }
         } else {
             let path = format!("{}{}/", self.path, token);
-            let mut route = if tokens.len() == 1 {
+            let mut route;
+            if tokens.len() == 1 {
                 // only add handler at the end of the tokens vector
-                Route::new(path, placeholder, Some(handler), HashMap::new())
+                route = Route::new(path, placeholder, Some(Box::new(handler)), HashMap::new());
             } else {
-                Route::new(path, placeholder, None, HashMap::new())
+                route = Route::new(path, placeholder, None, HashMap::new());
+                // will split at 1 panic? No, it panic if {at} > len()
+                route.add(tokens.split_off(1), handler);
             };
-            // will split at 1 panic? No, it panic if at > len()
-            route.add(tokens.split_off(1), handler);
             self.sub_routes.entry(token.to_string()).or_insert(route);
         }
     }
 
-    fn handle(&self, request: &Request) {}
+    fn handle(&self, request: &impl IRequest) -> Box<dyn IResponse> {
+        let p = request.get_path_variables();
+        if p.len() == 1 {
+            let handler = self.handler.as_ref().unwrap();
+            handler(request)
+        } else {
+            let r = Request{ method: request.get_method(), path_variables: request.get_path_variables().clone(), query_parameters: request.get_query_parameters().clone(), body: String::new()};
+            let child_route = self.sub_routes.get(&p[1]).unwrap();
+            child_route.handle(&r)
+        }
+    }
 }
 
-impl<T, V> Display for Route<T, V> {
+impl Display for Route {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.sub_routes.len() == 0{
             write!(f, "{}\n", self.path).unwrap();

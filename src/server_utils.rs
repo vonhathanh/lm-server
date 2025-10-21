@@ -11,11 +11,11 @@ pub fn parse_request(input: &String) -> Request {
 
         match path.find('?') {
             Some(idx) => {
-                path_variables = parse_path_variables(&input[..idx]);
-                query_parameters = parse_query_parameters(&input[idx+1..])
+                path_variables = parse_path_variables(&path[..idx]);
+                query_parameters = parse_query_parameters(&path[idx+1..])
             },
             None => {
-                path_variables = parse_path_variables(&input[..]);
+                path_variables = parse_path_variables(&path[..]);
                 query_parameters = Vec::new();
             }
         }
