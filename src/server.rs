@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
 };
 
@@ -141,15 +141,39 @@ impl Server {
     }
 
     fn handle_connection(&self, mut stream: TcpStream) {
-        let buf_reader = BufReader::new(&stream);
-        let content: Vec<String> = buf_reader
-            .lines()
-            .map(|value| value.unwrap())
-            .take_while(|line| !line.is_empty())
-            .collect();
+        let mut buf_reader = BufReader::new(&stream);
+        // read request line
+        let mut request_line: String = String::new();
+        buf_reader.read_line(&mut request_line).unwrap();
+        let mut request: Request = parse_request(&request_line);
 
-        println!("Request content: {content:#?}");
-        let request: Request = parse_request(&content[0]);
+        // read header
+        let mut header = HashMap::new();
+        loop {
+            let mut buf = String::new();
+
+            buf_reader.read_line(&mut buf).unwrap();
+
+            if buf.trim().is_empty() {
+                break;
+            }
+
+            if let Some((key, value)) = buf.split_once(':') {
+                header.insert(key.trim().to_string(), value.trim().to_string());
+            }
+        }
+
+        // read body
+        let body = if let Some(str_len) = header.get("content-length") {
+            let content_length = str_len.parse().unwrap_or(0);
+            let mut buffer = vec![0u8; content_length];
+            buf_reader.read_exact(&mut buffer).unwrap();
+            String::from_utf8_lossy(&buffer).to_string()
+        } else {
+            String::new()
+        };
+
+        request.body = body;
 
         self.match_request(&request, &mut stream);
     }
