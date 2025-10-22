@@ -148,7 +148,7 @@ impl Server {
 
     fn match_request(&self, request: &impl IRequest, stream: &mut TcpStream) {
         let method = request.get_method();
-        let root = self.routes.get(&method).unwrap();
+        let root = self.routes.get(method).unwrap();
         let handler = root.get(request.get_path()).unwrap();
         let response = handler.handler.as_ref()(request);
         let response = format!(
