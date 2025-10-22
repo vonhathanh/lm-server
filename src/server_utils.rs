@@ -15,12 +15,12 @@ pub fn parse_request(input: &String) -> Request {
         }
     }
 
-    Request {
-        method: method.to_string(),
-        path: path.to_string(),
+    Request::new(
+        method.to_string(),
+        path.to_string(),
         query,
-        body: "".to_string(),
-    }
+        "".to_string()
+    )
 }
 
 fn parse_query(input: &str) -> Vec<(String, String)> {

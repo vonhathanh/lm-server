@@ -14,6 +14,7 @@ pub trait IRequest {
     fn get_method(&self) -> &str;
     fn get_path(&self) -> &str;
     fn get_query(&self) -> &[(String, String)];
+    fn get_body(&self) -> &str;
 }
 
 pub trait IResponse {
@@ -28,13 +29,18 @@ pub trait IResponse {
 // for data-owning struct: use String is a better choice. We don't have to deal with lifetime and can modify data
 // at our own will. If we want &str we can expose methods that return &str
 pub struct Request {
-    pub method: String,
-    pub path: String,
-    pub query: Vec<(String, String)>,
-    pub body: String,
+    method: String,
+    path: String,
+    query: Vec<(String, String)>,
+    body: String,
 }
 pub struct Response(pub String);
 
+impl Request {
+    pub fn new(method: String, path: String, query: Vec<(String, String)>, body: String) -> Self {
+        Request { method, path, query, body }
+    }
+}
 impl IRequest for Request {
     fn get_method(&self) -> &str {
         &self.method
@@ -46,6 +52,10 @@ impl IRequest for Request {
 
     fn get_query(&self) -> &[(String, String)] {
         &self.query
+    }
+
+    fn get_body(&self) -> &str {
+        &self.body
     }
 }
 
