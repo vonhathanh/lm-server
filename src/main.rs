@@ -1,8 +1,8 @@
 use crate::server::{IRequest, IResponse, Response, Server};
 
+pub mod auth;
 pub mod server;
 pub mod server_utils;
-pub mod auth;
 
 // must return Box<T> because trait object is dynamically sized type, so we wrap it inside a smart pointer
 fn index(_r: &dyn IRequest) -> Box<dyn IResponse> {

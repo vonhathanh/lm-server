@@ -38,7 +38,12 @@ pub struct Response(pub String);
 
 impl Request {
     pub fn new(method: String, path: String, query: Vec<(String, String)>, body: String) -> Self {
-        Request { method, path, query, body }
+        Request {
+            method,
+            path,
+            query,
+            body,
+        }
     }
 }
 impl IRequest for Request {
@@ -69,7 +74,7 @@ impl IResponse for Response {
     }
 }
 
-// a Boxed closure/function that accepts a reference to any object that implements IRequest trait and 
+// a Boxed closure/function that accepts a reference to any object that implements IRequest trait and
 // return a boxed object that implement IResponse trait
 // both must be Boxed because trait objec (DST) can't be stored or returned directly without indirection
 type RequestHandler = Box<dyn Fn(&dyn IRequest) -> Box<dyn IResponse>>;
