@@ -19,6 +19,9 @@ pub trait IRequest {
 pub trait IResponse {
     fn len(&self) -> usize;
     fn body(&self) -> &str;
+    fn status(&self) -> &str {
+        "HTTP/1.1 200 OK"
+    }
 }
 
 #[derive(Debug)]
@@ -56,6 +59,9 @@ impl IResponse for Response {
     }
 }
 
+// a Boxed closure/function that accepts a reference to any object that implements IRequest trait and 
+// return a boxed object that implement IResponse trait
+// both must be Boxed because trait objec (DST) can't be stored or returned directly without indirection
 type RequestHandler = Box<dyn Fn(&dyn IRequest) -> Box<dyn IResponse>>;
 
 pub struct Server {
@@ -144,7 +150,8 @@ impl Server {
         let handler = root.get(request.get_path()).unwrap();
         let response = handler.as_ref()(request);
         let response = format!(
-            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+            "{}\r\nContent-Length: {}\r\n\r\n{}",
+            response.status(),
             response.len(),
             response.body()
         );
