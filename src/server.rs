@@ -8,18 +8,22 @@ use crate::server_utils::parse_request;
 
 const SERVER_ADDRESS: &str = "127.0.0.1:8000";
 
+// use &str instead of &String because String is already a container for a str that is stored on the heap.
+// &String is a pointer to poiner, this is unnecessary
 pub trait IRequest {
-    fn get_method(&self) -> String;
-    fn get_path(&self) -> &String;
-    fn get_query(&self) -> &Vec<(String, String)>;
+    fn get_method(&self) -> &str;
+    fn get_path(&self) -> &str;
+    fn get_query(&self) -> &[(String, String)];
 }
 
 pub trait IResponse {
     fn len(&self) -> usize;
-    fn body(&self) -> &String;
+    fn body(&self) -> &str;
 }
 
 #[derive(Debug)]
+// for data-owning struct: use String is a better choice. We don't have to deal with lifetime and can modify data
+// at our own will. If we want &str we can expose methods that return &str
 pub struct Request {
     pub method: String,
     pub path: String,
@@ -29,15 +33,15 @@ pub struct Request {
 pub struct Response(pub String);
 
 impl IRequest for Request {
-    fn get_method(&self) -> String {
-        self.method.clone()
+    fn get_method(&self) -> &str {
+        &self.method
     }
 
-    fn get_path(&self) -> &String {
+    fn get_path(&self) -> &str {
         &self.path
     }
 
-    fn get_query(&self) -> &Vec<(String, String)> {
+    fn get_query(&self) -> &[(String, String)] {
         &self.query
     }
 }
@@ -47,7 +51,7 @@ impl IResponse for Response {
         self.0.len()
     }
 
-    fn body(&self) -> &String {
+    fn body(&self) -> &str {
         &self.0
     }
 }
@@ -55,6 +59,8 @@ impl IResponse for Response {
 type RequestHandler = Box<dyn Fn(&dyn IRequest) -> Box<dyn IResponse>>;
 
 pub struct Server {
+    // server own route data. It want to store them permanently until shutdown,
+    // not borrow them temporarily
     routes: HashMap<String, HashMap<String, Route>>,
 }
 
@@ -78,7 +84,7 @@ impl Server {
         }
     }
 
-    pub fn get<F>(&mut self, path: String, handler: F)
+    pub fn get<F>(&mut self, path: &str, handler: F)
     where
         F: Fn(&dyn IRequest) -> Box<dyn IResponse> + 'static,
     {
@@ -87,10 +93,10 @@ impl Server {
             .entry("GET".to_string())
             .or_insert(HashMap::new());
         let route = Route::new(Box::new(handler));
-        root.insert(path, route);
+        root.insert(path.to_string(), route);
     }
 
-    pub fn post<F>(&mut self, path: String, handler: F)
+    pub fn post<F>(&mut self, path: &str, handler: F)
     where
         F: Fn(&dyn IRequest) -> Box<dyn IResponse> + 'static,
     {
@@ -99,10 +105,10 @@ impl Server {
             .entry("POST".to_string())
             .or_insert(HashMap::new());
         let route = Route::new(Box::new(handler));
-        root.insert(path, route);
+        root.insert(path.to_string(), route);
     }
 
-    pub fn put<F>(&mut self, path: String, handler: F)
+    pub fn put<F>(&mut self, path: &str, handler: F)
     where
         F: Fn(&dyn IRequest) -> Box<dyn IResponse> + 'static,
     {
@@ -111,10 +117,10 @@ impl Server {
             .entry("PUT".to_string())
             .or_insert(HashMap::new());
         let route = Route::new(Box::new(handler));
-        root.insert(path, route);
+        root.insert(path.to_string(), route);
     }
 
-    pub fn delete<F>(&mut self, path: String, handler: F)
+    pub fn delete<F>(&mut self, path: &str, handler: F)
     where
         F: Fn(&dyn IRequest) -> Box<dyn IResponse> + 'static,
     {
@@ -123,7 +129,7 @@ impl Server {
             .entry("DELETE".to_string())
             .or_insert(HashMap::new());
         let route = Route::new(Box::new(handler));
-        root.insert(path, route);
+        root.insert(path.to_string(), route);
     }
 
     fn handle_connection(&self, mut stream: TcpStream) {
