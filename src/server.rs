@@ -61,11 +61,7 @@ type RequestHandler = Box<dyn Fn(&dyn IRequest) -> Box<dyn IResponse>>;
 pub struct Server {
     // server own route data. It want to store them permanently until shutdown,
     // not borrow them temporarily
-    routes: HashMap<String, HashMap<String, Route>>,
-}
-
-struct Route {
-    handler: RequestHandler,
+    routes: HashMap<String, HashMap<String, RequestHandler>>,
 }
 
 impl Server {
@@ -92,8 +88,7 @@ impl Server {
             .routes
             .entry("GET".to_string())
             .or_insert(HashMap::new());
-        let route = Route::new(Box::new(handler));
-        root.insert(path.to_string(), route);
+        root.insert(path.to_string(), Box::new(handler));
     }
 
     pub fn post<F>(&mut self, path: &str, handler: F)
@@ -104,8 +99,7 @@ impl Server {
             .routes
             .entry("POST".to_string())
             .or_insert(HashMap::new());
-        let route = Route::new(Box::new(handler));
-        root.insert(path.to_string(), route);
+        root.insert(path.to_string(), Box::new(handler));
     }
 
     pub fn put<F>(&mut self, path: &str, handler: F)
@@ -116,8 +110,7 @@ impl Server {
             .routes
             .entry("PUT".to_string())
             .or_insert(HashMap::new());
-        let route = Route::new(Box::new(handler));
-        root.insert(path.to_string(), route);
+        root.insert(path.to_string(), Box::new(handler));
     }
 
     pub fn delete<F>(&mut self, path: &str, handler: F)
@@ -128,8 +121,7 @@ impl Server {
             .routes
             .entry("DELETE".to_string())
             .or_insert(HashMap::new());
-        let route = Route::new(Box::new(handler));
-        root.insert(path.to_string(), route);
+        root.insert(path.to_string(), Box::new(handler));
     }
 
     fn handle_connection(&self, mut stream: TcpStream) {
@@ -150,18 +142,12 @@ impl Server {
         let method = request.get_method();
         let root = self.routes.get(method).unwrap();
         let handler = root.get(request.get_path()).unwrap();
-        let response = handler.handler.as_ref()(request);
+        let response = handler.as_ref()(request);
         let response = format!(
             "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
             response.len(),
             response.body()
         );
         stream.write_all(response.as_bytes()).unwrap();
-    }
-}
-
-impl Route {
-    fn new(handler: RequestHandler) -> Self {
-        Route { handler }
     }
 }
