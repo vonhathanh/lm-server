@@ -1,4 +1,4 @@
-use crate::server::{IRequest, IResponse, Response};
+use crate::server::{HttpStatus, IRequest, IResponse, Response};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -12,10 +12,11 @@ pub fn login(r: &dyn IRequest) -> Box<dyn IResponse> {
         Ok(cred) => {
             let response = format!("username: {}, password: {}", cred.username, cred.password);
             println!("{}", response);
-            Box::new(Response(response))
-        },
-        Err(_) => {
-            Box::new(Response("Invalid data format, expect {'username': string, 'password': string}".to_string()))
-        },
+            Box::new(Response::new(response, HttpStatus::OK.to_string()))
+        }
+        Err(_) => Box::new(Response::new(
+            "Invalid data format, expect {'username': string, 'password': string}".to_string(),
+            HttpStatus::BAD_REQUEST.to_string(),
+        )),
     }
 }

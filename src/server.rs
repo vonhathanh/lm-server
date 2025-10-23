@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt,
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
 };
@@ -7,6 +8,28 @@ use std::{
 use crate::server_utils::parse_request;
 
 const SERVER_ADDRESS: &str = "127.0.0.1:8000";
+
+pub enum HttpStatus {
+    OK,
+    BAD_REQUEST,
+    NOT_FOUND,
+    UNAUTHENTICATED,
+    UNAUTHORIZED,
+    INTERNAL_SERVER_ERROR,
+}
+
+impl fmt::Display for HttpStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HttpStatus::OK => write!(f, "HTTP/1.1 200 OK"),
+            HttpStatus::BAD_REQUEST => write!(f, "HTTP/1.1 400 Bad Request"),
+            HttpStatus::NOT_FOUND => write!(f, "HTTP/1.1 404 Not Found"),
+            HttpStatus::UNAUTHENTICATED => write!(f, "HTTP/1.1 401 Unauthorized"),
+            HttpStatus::UNAUTHORIZED => write!(f, "HTTP/1.1 403 Forbidden"),
+            HttpStatus::INTERNAL_SERVER_ERROR => write!(f, "HTTP/1.1 500 Internal Server Error"),
+        }
+    }
+}
 
 // use &str instead of &String because String is already a container for a str that is stored on the heap.
 // &String is a pointer to poiner, this is unnecessary
@@ -34,7 +57,10 @@ pub struct Request {
     query: Vec<(String, String)>,
     body: String,
 }
-pub struct Response(pub String);
+pub struct Response {
+    body: String,
+    status: String,
+}
 
 impl Request {
     pub fn new(method: String, path: String, query: Vec<(String, String)>, body: String) -> Self {
@@ -66,11 +92,24 @@ impl IRequest for Request {
 
 impl IResponse for Response {
     fn len(&self) -> usize {
-        self.0.len()
+        self.body.len()
     }
 
     fn body(&self) -> &str {
-        &self.0
+        &self.body
+    }
+
+    fn status(&self) -> &str {
+        &self.status
+    }
+}
+
+impl Response {
+    pub fn new(body: String, status: String) -> Self {
+        Response {
+            body: body,
+            status: status,
+        }
     }
 }
 
