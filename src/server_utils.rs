@@ -15,7 +15,7 @@ pub fn parse_request(input: &String) -> Request {
         }
     }
 
-    Request::new(method.to_string(), path.to_string(), query, "".to_string())
+    Request::new(method.to_string(), path.to_ascii_lowercase(), query, "".to_string())
 }
 
 fn parse_query(input: &str) -> Vec<(String, String)> {

@@ -72,6 +72,7 @@ impl Request {
         }
     }
 }
+
 impl IRequest for Request {
     fn get_method(&self) -> &str {
         &self.method
@@ -116,7 +117,7 @@ impl Response {
 // a Boxed closure/function that accepts a reference to any object that implements IRequest trait and
 // return a boxed object that implement IResponse trait
 // both must be Boxed because trait objec (DST) can't be stored or returned directly without indirection
-type RequestHandler = Box<dyn Fn(&dyn IRequest) -> Box<dyn IResponse>>;
+pub type RequestHandler = Box<dyn Fn(&dyn IRequest) -> Box<dyn IResponse>>;
 
 pub struct Server {
     // server own route data. It want to store them permanently until shutdown,
@@ -148,7 +149,7 @@ impl Server {
             .routes
             .entry("GET".to_string())
             .or_insert(HashMap::new());
-        root.insert(path.to_string(), Box::new(handler));
+        root.insert(path.to_ascii_lowercase(), Box::new(handler));
     }
 
     pub fn post<F>(&mut self, path: &str, handler: F)
@@ -159,7 +160,7 @@ impl Server {
             .routes
             .entry("POST".to_string())
             .or_insert(HashMap::new());
-        root.insert(path.to_string(), Box::new(handler));
+        root.insert(path.to_ascii_lowercase(), Box::new(handler));
     }
 
     pub fn put<F>(&mut self, path: &str, handler: F)
@@ -170,7 +171,7 @@ impl Server {
             .routes
             .entry("PUT".to_string())
             .or_insert(HashMap::new());
-        root.insert(path.to_string(), Box::new(handler));
+        root.insert(path.to_ascii_lowercase(), Box::new(handler));
     }
 
     pub fn delete<F>(&mut self, path: &str, handler: F)
@@ -181,7 +182,7 @@ impl Server {
             .routes
             .entry("DELETE".to_string())
             .or_insert(HashMap::new());
-        root.insert(path.to_string(), Box::new(handler));
+        root.insert(path.to_ascii_lowercase(), Box::new(handler));
     }
 
     fn handle_connection(&self, mut stream: TcpStream) {
