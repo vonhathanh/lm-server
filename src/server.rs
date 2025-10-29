@@ -5,7 +5,7 @@ use std::{
     net::{TcpListener, TcpStream},
 };
 
-use crate::server_utils::parse_request;
+use crate::{route::Route, server_utils::parse_request};
 
 const SERVER_ADDRESS: &str = "127.0.0.1:8000";
 
@@ -122,7 +122,8 @@ pub type RequestHandler = Box<dyn Fn(&dyn IRequest) -> Box<dyn IResponse>>;
 pub struct Server {
     // server own route data. It want to store them permanently until shutdown,
     // not borrow them temporarily
-    routes: HashMap<String, HashMap<String, RequestHandler>>,
+    // maps from request method (GET, POST,...) to root
+    routes: HashMap<String, Route>,
 }
 
 impl Server {
@@ -140,7 +141,7 @@ impl Server {
             self.handle_connection(tcp_stream);
         }
     }
-
+    // TODO: explain generic for fn. Why do we need + 'static?
     pub fn get<F>(&mut self, path: &str, handler: F)
     where
         F: Fn(&dyn IRequest) -> Box<dyn IResponse> + 'static,
@@ -148,8 +149,8 @@ impl Server {
         let root = self
             .routes
             .entry("GET".to_string())
-            .or_insert(HashMap::new());
-        root.insert(path.to_ascii_lowercase(), Box::new(handler));
+            .or_insert(Route::new(None));
+        root.insert(path.to_ascii_lowercase(), Some(Box::new(handler)));
     }
 
     pub fn post<F>(&mut self, path: &str, handler: F)
@@ -159,8 +160,8 @@ impl Server {
         let root = self
             .routes
             .entry("POST".to_string())
-            .or_insert(HashMap::new());
-        root.insert(path.to_ascii_lowercase(), Box::new(handler));
+            .or_insert(Route::new(None));
+        root.insert(path.to_ascii_lowercase(), Some(Box::new(handler)));
     }
 
     pub fn put<F>(&mut self, path: &str, handler: F)
@@ -170,8 +171,8 @@ impl Server {
         let root = self
             .routes
             .entry("PUT".to_string())
-            .or_insert(HashMap::new());
-        root.insert(path.to_ascii_lowercase(), Box::new(handler));
+            .or_insert(Route::new(None));
+        root.insert(path.to_ascii_lowercase(), Some(Box::new(handler)));
     }
 
     pub fn delete<F>(&mut self, path: &str, handler: F)
@@ -181,8 +182,8 @@ impl Server {
         let root = self
             .routes
             .entry("DELETE".to_string())
-            .or_insert(HashMap::new());
-        root.insert(path.to_ascii_lowercase(), Box::new(handler));
+            .or_insert(Route::new(None));
+        root.insert(path.to_ascii_lowercase(), Some(Box::new(handler)));
     }
 
     fn handle_connection(&self, mut stream: TcpStream) {
@@ -224,16 +225,16 @@ impl Server {
     }
 
     fn match_request(&self, request: &impl IRequest, stream: &mut TcpStream) {
-        let method = request.get_method();
-        let root = self.routes.get(method).unwrap();
-        let handler = root.get(request.get_path()).unwrap();
-        let response = handler.as_ref()(request);
-        let response = format!(
-            "{}\r\nContent-Length: {}\r\n\r\n{}",
-            response.status(),
-            response.len(),
-            response.body()
-        );
-        stream.write_all(response.as_bytes()).unwrap();
+        // let method = request.get_method();
+        // let root = self.routes.get(method).unwrap();
+        // let handler = root.get(request.get_path()).unwrap();
+        // let response = handler.as_ref()(request);
+        // let response = format!(
+        //     "{}\r\nContent-Length: {}\r\n\r\n{}",
+        //     response.status(),
+        //     response.len(),
+        //     response.body()
+        // );
+        // stream.write_all(response.as_bytes()).unwrap();
     }
 }
